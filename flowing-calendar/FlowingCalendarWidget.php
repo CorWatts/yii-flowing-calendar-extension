@@ -81,7 +81,7 @@ class FlowingCalendarWidget extends CWidget
 	 * Close Form: holds the </form> tag to close the form as well as table information
 	 */
 	public $title;
-	public $calendar;
+	public $this;
 	public $month = null;
 	public $year = null;
 	public $style = "calendar";
@@ -98,7 +98,14 @@ class FlowingCalendarWidget extends CWidget
 	public $displayControls;
 	public $startForm;
 	public $closeForm;
+	public $calendar;
 
+	// variables for scheduling
+	public $startDate = null;
+	public $schedule = null;
+	public $hiddenControlFields;
+	public $daysDifference;
+	
 	/*
 	 * Grab month and year from GET, if present
 	 * Otherwise, if user did not specify it in widget creation, then default
@@ -110,11 +117,20 @@ class FlowingCalendarWidget extends CWidget
 			$this->month = $_GET['month'];
 		if(isset($_GET['year']))
 			$this->year = $_GET['year'];
+		if(isset($_GET['startDate']))
+			$this->startDate = $_GET['startDate'];
+		if(isset($_GET['schedule']))
+			$this->schedule = $_GET['schedule'];
 
-		if(is_null($this->month))
+		// sanitization is especially important because parameters are passed via GET
+		if(is_null($this->month) || !preg_match('/^0?[1-9]|1[012]$/', $this->month))
 			$this->month = date("m");
-		if(is_null($this->year))
+		if(is_null($this->year) || !preg_match('/^(19|20)\d\d$/', $this->year))
 			$this->year = date("Y");
+		if(is_null($this->startDate) || !preg_match('/^(0[1-9]|1[012])[\/](0[1-9]|[12][0-9]|3[01])[ \/](19|20)\d\d$/', $this->startDate))
+			$this->startDate = date("m/d/Y");
+		if(!is_null($this->schedule) && !preg_match('/^[10](,[10])+$/', $this->schedule))
+			$this->schedule = null;
 
 		parent::init();
 	}
@@ -236,6 +252,11 @@ class FlowingCalendarWidget extends CWidget
 			$this->selectYear.= '<option value="'.$x.'"'.($x != $this->year ? '' : ' selected="selected"').'>'.$x.'</option>';
 		}
 		$this->selectYear.= '</select>';
+
+		/* hidden input fields with schedule and startDate */
+		$this->hiddenControlFields = "<input type='hidden' name='startDate' value='{$this->startDate}' />".
+			"<input type='hidden' name='schedule' value='{$this->schedule}' />";
+
 		
 		// For Yii Framework
 		$this->nextMonth = ($this->month != 12 ? $this->month + 1 : 1);
@@ -244,12 +265,36 @@ class FlowingCalendarWidget extends CWidget
 		$this->yearPreviousMonth = ($this->month != 1 ? $this->year : $this->year - 1);	
 		
 		/* Bring all the controls together in a menu */
-		$this->startForm = '<table cellpadding="0" cellspacing="0" class="'. $this->style .'-control"><tr><td><form method="get" style="text-align:center;">';
-		$this->displayControls = $this->selectMonth.$this->selectYear.
+		$this->startForm = '<table cellpadding="0" cellspacing="0" class="'. $this->style .'-control"><tr><td><form method="get">';
+		$this->displayControls = $this->hiddenControlFields.$this->selectMonth.$this->selectYear.
 			' <input type="submit" name="submit" value="Go" />';
 		$this->closeForm = '</form></td></tr></table>';
+
+		/*// Create links for the control menu
+		$this->nextMonthUrl = CExtController::createUrl('calendar/schedule', array(
+				'startDate'=>$this->startDate,
+				'schedule'=>$this->schedule,
+				'month'=>$this->nextMonth,
+				'year'=>$this->yearNextMonth)
+		);      
+		$this->previousMonthUrl = CExtController::createUrl('calendar/schedule', array(
+				'startDate'=>$this->startDate,
+				'schedule'=>$this->schedule,
+				'month'=>$this->previousMonth,
+				'year'=>$this->yearPreviousMonth)
+		);      
+		$this->storePreviousLink = CHtml::link("<< Previous Month", $this->previousMonthUrl);
+		$this->storeNextLink = CHtml::link("Next Month >>", $this->nextMonthUrl);*/
 	}
 	
+	/* Calculates the days inbetween two given dates */
+	public function daysInbetween($startDate, $firstOfMonth) {
+		$start = strtotime($startDate);
+		$end = strtotime($firstOfMonth);
+
+		$secDiff = $end - $start;
+		return floor(abs($secDiff / (60*60*24)));
+	}
 	/*
 	 * Draw the Calendar
 	 */
@@ -278,6 +323,18 @@ class FlowingCalendarWidget extends CWidget
 		$day_counter = 0;
 		$dates_array = array();
 	
+		/********************************* CODE ADDED BY ME ******************************************/ 
+		// number of days inbetween start date and first of month
+		$daysDifference = $this->daysInbetween($this->startDate, "{$this->month}/01/{$this->year}");
+		print "days difference : ".$daysDifference;
+
+		$scheduleArray = explode(",", $this->schedule);
+		$scheduleLength = sizeof($scheduleArray);
+		$firstScheduleDay = ($daysDifference % sizeof($scheduleArray)) - 1; // subtract 1 because arrays start at 0, and we will be iterating through our schedule array
+		print "Schedule day that falls on first of month is : ".($firstScheduleDay+1);
+
+		/*********************************************************************************************/
+
 		/* row for week one */
 		$this->calendar.= '<tr class="'. $this->style .'-row">';
 	
@@ -290,19 +347,32 @@ class FlowingCalendarWidget extends CWidget
 		/* keep going with days.... */
 		for($list_day = 1; $list_day <= $days_in_month; $list_day++):
 
+			/*********************************************************************************/
+			// range is: from 0 to length(array) - 1
+			$currentScheduleDay = ($list_day + $firstScheduleDay) % $scheduleLength; // what schedule day falls on the current day iteration
+			//$scheduleToday = $scheduleArray[$currentScheduleDay] ? "on" : "off";
+			if($scheduleArray[$currentScheduleDay] == "1")
+				$scheduleToday = "on";
+			elseif($scheduleArray[$currentScheduleDay] == "0")
+				$scheduleToday = "off";
+			else
+				$scheduleToday = "";
+
+			/*********************************************************************************/
+
 			if($list_day == date("j",mktime(0,0,0,$this->month))	&& date("n") == $this->month && date("Y") == $this->year)
 			{	
-				$this->calendar.= '<td class="'. $this->style .'-current-day">';
+				$this->calendar.= '<td class="'. $this->style .'-current-day '.$scheduleToday.'">';
 			}
 			else			
 			{	
 				if(($running_day == "0") || ($running_day == "6"))
 				{
-				 $this->calendar.= '<td class="'. $this->style .'-weekend-day">';
+				 $this->calendar.= '<td class="'. $this->style .'-weekend-day '.$scheduleToday.'">';
 				}
 				else
 				{
-				 $this->calendar.= '<td class="'. $this->style .'-day">';	
+				 $this->calendar.= '<td class="'. $this->style .'-day '.$scheduleToday.'">';	
 				}
 			}
 			

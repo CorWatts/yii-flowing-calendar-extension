@@ -1,4 +1,4 @@
-  /*
+ /*
   * This Calendar Application was designed by:
   *
   *         Kyle Ferreira
@@ -31,6 +31,8 @@ table.calendar-control {
 /* This changes the select month and select year drop down menus */
 table.calendar-control-select {  
 }
+
+table.calendar-control td {text-align: center;}
 
 tr.calendar-row {  
 }
@@ -65,6 +67,12 @@ td.calendar-weekend-day    {
 }
 td.calendar-current-day    {
      background-color: #ECEFF5;
+}
+table td.on {
+	background-color: blue;
+}
+table td.off {
+	background-color: red;
 }
 /* These colours are for the mouse over effects on the calendar */
 td.calendar-day:hover {
