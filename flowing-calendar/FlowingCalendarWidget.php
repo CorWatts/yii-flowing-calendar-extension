@@ -243,8 +243,11 @@ class FlowingCalendarWidget extends CWidget
 		$this->previousMonth = ($this->month != 1 ? $this->month - 1 : 12);
 		$this->yearPreviousMonth = ($this->month != 1 ? $this->year : $this->year - 1);	
 		
-		/* Bring all the controls together in a menu */
-		$this->startForm = '<table cellpadding="0" cellspacing="0" class="'. $this->style .'-control"><tr><td><form method="get" style="text-align:center;">';
+		/* Bring all the controls together in a menu  */
+		// BUGFIX -Ensure the route "r=controller/action" is properly set by calling CHtml::beginForm()
+        	// without this the <form> simply sends the GET data back to the "default" controller's default action (ie.. site/index)-TLDJR
+        	$routeString = "".Yii::app()->controller->id."/".Yii::app()->controller->action->id; 
+		$this->startForm = '<table cellpadding="0" cellspacing="0" class="'. $this->style .'-control"><tr><td>'.CHtml::beginForm(Yii::app()->createAbsoluteUrl($routeString),'get');
 		$this->displayControls = $this->selectMonth.$this->selectYear.
 			' <input type="submit" name="submit" value="Go" />';
 		$this->closeForm = '</form></td></tr></table>';
